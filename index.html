@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Interaktif PID: Detektif Rasio MBG</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .font-fredoka {
+            font-family: 'Fredoka', cursive, sans-serif;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        .food-item {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+        .food-item:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+        }
+        .drop-zone {
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .drop-zone.drag-over {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.15);
+        }
+        /* Custom Scrollbar for PID touchscreen */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col justify-between p-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+
+    <!-- TOP BAR: Header, Timers & Score Board -->
+    <header class="w-full glass-card rounded-2xl p-4 flex items-center justify-between shadow-2xl">
+        <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
+                🔍
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold font-fredoka text-emerald-400 tracking-wide">DETEKTIF RASIO MBG</h1>
+                <p class="text-xs text-slate-400">UPTD SDN 8 TEGINENENG • Papan Interaktif Digital (PID)</p>
+            </div>
+        </div>
+
+        <!-- Mode Selector / Status -->
+        <div class="flex space-x-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
+            <button id="btn-mode-1" onclick="switchMode(1)" class="px-4 py-2 rounded-lg font-semibold text-sm transition-all bg-emerald-500 text-white shadow-md">
+                1. Eksplorasi Visual
+            </button>
+            <button id="btn-mode-2" onclick="switchMode(2)" class="px-4 py-2 rounded-lg font-semibold text-sm transition-all text-slate-300 hover:bg-slate-700">
+                2. Misi Kelompok
+            </button>
+            <button id="btn-mode-3" onclick="switchMode(3)" class="px-4 py-2 rounded-lg font-semibold text-sm transition-all text-slate-300 hover:bg-slate-700">
+                3. Refleksi HOTS
+            </button>
+        </div>
+
+        <!-- Kelompok & Score Indicator -->
+        <div class="flex items-center space-x-4">
+            <div class="text-right">
+                <span class="text-xs text-slate-400 block">Kelompok Aktif:</span>
+                <select id="active-team" class="bg-slate-800 text-amber-400 font-bold border border-amber-500/30 rounded-lg px-2 py-1 text-sm focus:outline-none">
+                    <option value="Kelompok Protein">🥩 Kelompok Protein</option>
+                    <option value="Kelompok Karbo">🍚 Kelompok Karbo</option>
+                    <option value="Kelompok Vitamin">🍎 Kelompok Vitamin</option>
+                    <option value="Kelompok Mineral">🥛 Kelompok Mineral</option>
+                </select>
+            </div>
+            <div class="bg-amber-500/20 border border-amber-500/40 px-4 py-2 rounded-xl text-center">
+                <span class="text-xs text-amber-300 font-medium block">SKOR PID</span>
+                <span id="score-display" class="text-2xl font-black font-fredoka text-amber-400">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN INTERACTIVE AREA -->
+    <main class="w-full flex-1 my-4 grid grid-cols-12 gap-4 overflow-hidden">
+
+        <!-- LEFT PANEL: Food Palette / Controls -->
+        <section class="col-span-4 glass-card rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+                <h2 class="text-lg font-bold text-indigo-300 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-utensils"></i> Item Makanan MBG
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">Sentuh & Geser (Drag) makanan ke Piring Interaktif PID di kanan!</p>
+
+                <!-- Draggable Items Palette -->
+                <div class="grid grid-cols-2 gap-3" id="food-palette">
+                    <!-- Telur -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="telur" data-name="Telur Rebus" data-icon="🥚"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🥚</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Telur Rebus</p>
+                            <span class="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">Protein</span>
+                        </div>
+                    </div>
+
+                    <!-- Apel -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="apel" data-name="Buah Apel" data-icon="🍎"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🍎</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Buah Apel</p>
+                            <span class="text-[10px] text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">Vitamin</span>
+                        </div>
+                    </div>
+
+                    <!-- Nasi -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="nasi" data-name="Porsi Nasi" data-icon="🍚"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🍚</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Porsi Nasi</p>
+                            <span class="text-[10px] text-blue-400 bg-blue-950 px-1.5 py-0.5 rounded border border-blue-800">Karbohidrat</span>
+                        </div>
+                    </div>
+
+                    <!-- Sayur -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="sayur" data-name="Mangkok Sayur" data-icon="🥦"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🥦</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Mangkok Sayur</p>
+                            <span class="text-[10px] text-green-400 bg-green-950 px-1.5 py-0.5 rounded border border-green-800">Serat</span>
+                        </div>
+                    </div>
+
+                    <!-- Susu -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="susu" data-name="Kotak Susu" data-icon="🥛"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🥛</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Kotak Susu</p>
+                            <span class="text-[10px] text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">Kalsium</span>
+                        </div>
+                    </div>
+
+                    <!-- Tempe -->
+                    <div draggable="true" ondragstart="drag(event)" data-type="tempe" data-name="Potong Tempe" data-icon="🍱"
+                        class="food-item bg-slate-800 hover:bg-slate-700/80 p-3 rounded-xl border border-slate-700 flex items-center space-x-3 shadow-md">
+                        <span class="text-3xl">🍱</span>
+                        <div>
+                            <p class="font-bold text-sm text-slate-200">Potong Tempe</p>
+                            <span class="text-[10px] text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">Protein Nabati</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Touch Buttons (Mobile/PID Friendly) -->
+            <div class="mt-4 pt-3 border-t border-slate-700">
+                <span class="text-xs text-slate-400 mb-2 block font-semibold">Atau Sentuh Cepat untuk Tambah:</span>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="addFoodQuick('telur')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-sm">🥚 +Telur</button>
+                    <button onclick="addFoodQuick('apel')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-sm">🍎 +Apel</button>
+                    <button onclick="addFoodQuick('nasi')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-sm">🍚 +Nasi</button>
+                    <button onclick="addFoodQuick('sayur')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-sm">🥦 +Sayur</button>
+                    <button onclick="addFoodQuick('susu')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-sm">🥛 +Susu</button>
+                </div>
+                <button onclick="clearPlate()" class="w-full mt-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 py-2 rounded-xl text-sm font-semibold transition">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Kosongkan Piring PID
+                </button>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: Plate Drop Zone & Dynamic Math Output -->
+        <section class="col-span-8 glass-card rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden">
+            
+            <!-- MODE 1 & 2: Interactive Plate Area -->
+            <div id="view-interactive" class="h-full flex flex-col">
+                
+                <!-- Mission Box (Active on Mode 2) -->
+                <div id="mission-card" class="hidden bg-indigo-950/80 border border-indigo-500/40 rounded-xl p-3 mb-3 shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <span class="bg-indigo-600 text-white text-xs font-bold px-2.5 py-1 rounded-md">MISI KELOMPOK</span>
+                        <span id="mission-timer" class="text-xs font-mono text-amber-300 font-bold"><i class="fa-regular fa-clock"></i> Waktu: 45s</span>
+                    </div>
+                    <p id="mission-prompt" class="text-base font-bold text-amber-300 mt-2">
+                        "Raciklah piring MBG dengan Rasio Telur Rebus terhadap Buah Apel sebesar 2 : 4 !"
+                    </p>
+                </div>
+
+                <!-- Digital Plate (Drop Zone) -->
+                <div id="drop-zone" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"
+                    class="drop-zone flex-1 bg-slate-900/60 border-4 border-dashed border-slate-700 rounded-2xl p-4 flex flex-wrap content-start gap-3 items-center justify-center relative overflow-y-auto min-h-[220px]">
+                    
+                    <div id="empty-state" class="text-center text-slate-500 pointer-events-none my-auto">
+                        <i class="fa-solid fa-plate-wheat text-6xl mb-2 opacity-40"></i>
+                        <p class="text-lg font-bold">Piring Makan Bergizi Gratis (MBG)</p>
+                        <p class="text-xs">Tarik makanan ke sini atau sentuh tombol tambah</p>
+                    </div>
+
+                    <!-- Dynamic Food Nodes Will Append Here -->
+                </div>
+
+                <!-- DYNAMIC RATIO ANALYZER PANEL -->
+                <div class="mt-4 bg-slate-800/90 border border-slate-700 rounded-xl p-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-emerald-400"></i> Pembaca Rasio & Bahasa Rasio Otomatis
+                    </h3>
+                    
+                    <div class="grid grid-cols-2 gap-4 items-center">
+                        <!-- Mathematical Ratio -->
+                        <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                            <span class="text-xs text-slate-400 block">Bentuk Rasio (a : b):</span>
+                            <span id="ratio-math-display" class="text-2xl font-black font-fredoka text-emerald-400">0 : 0</span>
+                            <span id="simplified-ratio-display" class="text-xs text-slate-400 block mt-0.5">(Sederhana: -)</span>
+                        </div>
+
+                        <!-- Bahasa Rasio -->
+                        <div class="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                            <span class="text-xs text-slate-400 block">Bahasa Rasio Matematika:</span>
+                            <p id="ratio-language-display" class="text-sm font-semibold text-amber-300 italic">
+                                "Belum ada 2 kelompok benda untuk dibandingkan"
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Action Check Button (For Mode 2 Mission) -->
+                    <button id="btn-submit-mission" onclick="checkMissionAnswer()" class="hidden w-full mt-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg transition text-base">
+                        <i class="fa-solid fa-circle-check mr-2"></i> PERIKSA JAWABAN MISI KELOMPOK
+                    </button>
+                </div>
+            </div>
+
+            <!-- MODE 3: HOTS Reflection Area -->
+            <div id="view-hots" class="hidden h-full flex flex-col justify-between p-2">
+                <div class="bg-indigo-950/90 border border-indigo-500/50 rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="text-4xl">🤔</span>
+                        <div>
+                            <h3 class="text-xl font-bold text-amber-400 font-fredoka">Tantangan Detektif HOTS & Karakter</h3>
+                            <p class="text-xs text-slate-300">Hubungan Rasio Matematika dengan Pola Hidup Sehat</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 mb-4">
+                        <p class="text-sm text-slate-200 leading-relaxed font-semibold">
+                            Kasus Detektif: <br>
+                            <span class="text-amber-300">"Siswa Budi mengambil menu MBG dengan perbandingan Nasi : Sayur sebesar 6 : 1."</span>
+                        </p>
+                    </div>
+
+                    <p class="text-sm text-slate-300 mb-3">Analisis bersama kelompokmu:</p>
+                    <div class="space-y-2 text-xs">
+                        <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex items-start space-x-2">
+                            <span class="text-emerald-400 font-bold">1.</span>
+                            <span>Apakah rasio makanan Budi sudah mencerminkan **Gizi Seimbang** (7 Kebiasaan Anak Indonesia Hebat)?</span>
+                        </div>
+                        <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex items-start space-x-2">
+                            <span class="text-emerald-400 font-bold">2.</span>
+                            <span>Bagaimana bentuk kalimat **Bahasa Rasio** yang tepat untuk menyarankan porsi ideal Budi?</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center">
+                    <span class="text-sm font-bold text-slate-200">Kirim Kesimpulan Diskusi Kelompok ke PID:</span>
+                    <button onclick="playSuccessSound(); alert('Terima Kasih! Refleksi Kelompok Berhasil Terekam di PID.')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg transition text-sm">
+                        <i class="fa-solid fa-paper-plane mr-2"></i> Simpan Hasil Refleksi
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- FOOTER: Message Log & Controls -->
+    <footer class="w-full glass-card rounded-2xl px-4 py-2 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="status-footer">PID Siap Digunakan • Sentuh elemen di layar</span>
+        </div>
+        <div>
+            <span>Matematika Kelas VI • Rasio & Perbandingan</span>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // State Variables
+        let currentMode = 1;
+        let plateItems = [];
+        let score = 0;
+        let activeMission = null;
+
+        // Sound Synthesis (Web Audio API for interactive SFX)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playPopSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playSuccessSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+            osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        }
+
+        // Drag & Drop Handlers
+        function allowDrop(ev) {
+            ev.preventDefault();
+            document.getElementById('drop-zone').classList.add('drag-over');
+        }
+
+        function dragLeave(ev) {
+            document.getElementById('drop-zone').classList.remove('drag-over');
+        }
+
+        function drag(ev) {
+            const type = ev.currentTarget.getAttribute('data-type');
+            const name = ev.currentTarget.getAttribute('data-name');
+            const icon = ev.currentTarget.getAttribute('data-icon');
+            ev.dataTransfer.setData("application/json", JSON.stringify({ type, name, icon }));
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            document.getElementById('drop-zone').classList.remove('drag-over');
+            const data = JSON.parse(ev.dataTransfer.getData("application/json"));
+            addItemToPlate(data.type, data.name, data.icon);
+        }
+
+        function addFoodQuick(type) {
+            const itemsMap = {
+                'telur': { name: 'Telur Rebus', icon: '🥚' },
+                'apel': { name: 'Buah Apel', icon: '🍎' },
+                'nasi': { name: 'Porsi Nasi', icon: '🍚' },
+                'sayur': { name: 'Mangkok Sayur', icon: '🥦' },
+                'susu': { name: 'Kotak Susu', icon: '🥛' },
+                'tempe': { name: 'Potong Tempe', icon: '🍱' }
+            };
+            if(itemsMap[type]) {
+                addItemToPlate(type, itemsMap[type].name, itemsMap[type].icon);
+            }
+        }
+
+        function addItemToPlate(type, name, icon) {
+            playPopSound();
+            const id = Date.now() + Math.random();
+            plateItems.push({ id, type, name, icon });
+            renderPlate();
+            calculateRatio();
+        }
+
+        function removeItemFromPlate(id) {
+            plateItems = plateItems.filter(item => item.id !== id);
+            playPopSound();
+            renderPlate();
+            calculateRatio();
+        }
+
+        function clearPlate() {
+            plateItems = [];
+            renderPlate();
+            calculateRatio();
+        }
+
+        function renderPlate() {
+            const dropZone = document.getElementById('drop-zone');
+            const emptyState = document.getElementById('empty-state');
+
+            // Clear non-empty state elements
+            const existingItems = dropZone.querySelectorAll('.plate-item-node');
+            existingItems.forEach(el => el.remove());
+
+            if (plateItems.length === 0) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+                plateItems.forEach(item => {
+                    const node = document.createElement('div');
+                    node.className = 'plate-item-node bg-slate-800/90 border border-slate-600 text-white px-3 py-2 rounded-xl flex items-center space-x-2 shadow-lg animate-bounce-short';
+                    node.innerHTML = `
+                        <span class="text-2xl">${item.icon}</span>
+                        <span class="text-xs font-bold">${item.name}</span>
+                        <button onclick="removeItemFromPlate(${item.id})" class="text-rose-400 hover:text-rose-200 ml-1 font-bold">×</button>
+                    `;
+                    dropZone.appendChild(node);
+                });
+            }
+        }
+
+        // GCD Function for simplified ratio
+        function gcd(a, b) {
+            return b == 0 ? a : gcd(b, a % b);
+        }
+
+        // Calculate and Display Ratio
+        function calculateRatio() {
+            const mathDisplay = document.getElementById('ratio-math-display');
+            const simplifiedDisplay = document.getElementById('simplified-ratio-display');
+            const langDisplay = document.getElementById('ratio-language-display');
+
+            if (plateItems.length === 0) {
+                mathDisplay.innerText = "0 : 0";
+                simplifiedDisplay.innerText = "(Sederhana: -)";
+                langDisplay.innerText = '"Belum ada benda di piring PID"';
+                return;
+            }
+
+            // Count frequencies per type
+            const counts = {};
+            plateItems.forEach(item => {
+                counts[item.type] = (counts[item.type] || 0) + 1;
+            });
+
+            const types = Object.keys(counts);
+
+            if (types.length === 1) {
+                const singleType = plateItems[0].name;
+                const count = counts[types[0]];
+                mathDisplay.innerText = `${count} : 0`;
+                simplifiedDisplay.innerText = `(Membutuhkan 1 jenis makanan lagi untuk membandingkan)`;
+                langDisplay.innerText = `"Ada ${count} ${singleType}. Tambahkan makanan jenis lain!"`;
+            } else if (types.length >= 2) {
+                // Compare first two types added
+                const typeA = types[0];
+                const typeB = types[1];
+
+                const countA = counts[typeA];
+                const countB = counts[typeB];
+
+                const nameA = plateItems.find(i => i.type === typeA).name;
+                const nameB = plateItems.find(i => i.type === typeB).name;
+
+                mathDisplay.innerText = `${countA} : ${countB}`;
+
+                // Simplified
+                const divisor = gcd(countA, countB);
+                const simpA = countA / divisor;
+                const simpB = countB / divisor;
+
+                simplifiedDisplay.innerText = `(Bentuk Sederhana = ${simpA} : ${simpB})`;
+
+                // Bahasa Rasio Klausa
+                langDisplay.innerText = `"Untuk setiap ${simpA} ${nameA}, terdapat ${simpB} ${nameB}."`;
+            }
+        }
+
+        // Mode Switching
+        function switchMode(modeNum) {
+            currentMode = modeNum;
+            document.getElementById('btn-mode-1').className = modeNum === 1 ? 'px-4 py-2 rounded-lg font-semibold text-sm transition-all bg-emerald-500 text-white shadow-md' : 'px-4 py-2 rounded-lg font-semibold text-sm transition-all text-slate-300 hover:bg-slate-700';
+            document.getElementById('btn-mode-2').className = modeNum === 2 ? 'px-4 py-2 rounded-lg font-semibold text-sm transition-all bg-emerald-500 text-white shadow-md' : 'px-4 py-2 rounded-lg font-semibold text-sm transition-all text-slate-300 hover:bg-slate-700';
+            document.getElementById('btn-mode-3').className = modeNum === 3 ? 'px-4 py-2 rounded-lg font-semibold text-sm transition-all bg-emerald-500 text-white shadow-md' : 'px-4 py-2 rounded-lg font-semibold text-sm transition-all text-slate-300 hover:bg-slate-700';
+
+            const viewInteractive = document.getElementById('view-interactive');
+            const viewHots = document.getElementById('view-hots');
+            const missionCard = document.getElementById('mission-card');
+            const btnSubmitMission = document.getElementById('btn-submit-mission');
+
+            if (modeNum === 1) {
+                viewInteractive.classList.remove('hidden');
+                viewHots.classList.add('hidden');
+                missionCard.classList.add('hidden');
+                btnSubmitMission.classList.add('hidden');
+                document.getElementById('status-footer').innerText = "Mode 1: Eksplorasi Konsep Rasio Visual & Bahasa Rasio";
+            } else if (modeNum === 2) {
+                viewInteractive.classList.remove('hidden');
+                viewHots.classList.add('hidden');
+                missionCard.classList.remove('hidden');
+                btnSubmitMission.classList.remove('hidden');
+                document.getElementById('status-footer').innerText = "Mode 2: Turnamen Misi Kelompok Detektif Rasio MBG";
+                loadMission();
+            } else if (modeNum === 3) {
+                viewInteractive.classList.add('hidden');
+                viewHots.classList.remove('hidden');
+                document.getElementById('status-footer').innerText = "Mode 3: Refleksi HOTS & Internalisasi Gizi Seimbang";
+            }
+        }
+
+        // Mode 2 Missions Generator
+        const missions = [
+            { targetA: 'telur', targetB: 'apel', ratioA: 2, ratioB: 4, prompt: '"Racik piring MBG dengan Rasio Telur Rebus terhadap Buah Apel sebesar 2 : 4 !"' },
+            { targetA: 'susu', targetB: 'nasi', ratioA: 1, ratioB: 3, prompt: '"Racik piring MBG dengan Rasio Kotak Susu terhadap Porsi Nasi sebesar 1 : 3 !"' },
+            { targetA: 'sayur', targetB: 'tempe', ratioA: 3, ratioB: 2, prompt: '"Racik piring MBG dengan Rasio Mangkok Sayur terhadap Potong Tempe sebesar 3 : 2 !"' }
+        ];
+
+        function loadMission() {
+            activeMission = missions[Math.floor(Math.random() * missions.length)];
+            document.getElementById('mission-prompt').innerText = activeMission.prompt;
+            clearPlate();
+        }
+
+        function checkMissionAnswer() {
+            if (!activeMission) return;
+
+            const counts = {};
+            plateItems.forEach(item => {
+                counts[item.type] = (counts[item.type] || 0) + 1;
+            });
+
+            const countA = counts[activeMission.targetA] || 0;
+            const countB = counts[activeMission.targetB] || 0;
+
+            if (countA === activeMission.ratioA && countB === activeMission.ratioB) {
+                playSuccessSound();
+                score += 100;
+                document.getElementById('score-display').innerText = score;
+                alert("🎉 LUAR BIASA! Jawaban Kelompok Tepat Sekali!\n\nSkor +100 poin ditambahkan ke Papan Pemeringkat PID.");
+                loadMission();
+            } else {
+                alert(`⚠️ Jawaban belum tepat!\n\nTarget Rasio: ${activeMission.ratioA} : ${activeMission.ratioB}\nSaat ini di piring: ${countA} : ${countB}\n\nCoba sesuaikan jumlah makanan di piring PID!`);
+            }
+        }
+    </script>
+</body>
+</html>
